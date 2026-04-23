@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+__dependabot_usage() {
+  cat <<EOF >&2
+Usage: gh prs dependabot <sub-command>
+
+Trigger dependabot commands on all open dependabot PRs in the repository.
+
+Sub-commands:
+  rebase    Post '@dependabot rebase' on every open dependabot PR
+  recreate  Post '@dependabot recreate' on every open dependabot PR
+
+Aliases: dbot
+EOF
+  exit "${1:-1}"
+}
+
+# Dispatch dependabot sub-commands: rebase, recreate
+cmd_dependabot() {
+  local subcmd="${1:-}"
+  if [[ -z "$subcmd" || "$subcmd" == "-h" || "$subcmd" == "--help" ]]; then
+    local exit_code=1
+    [[ "$subcmd" == "-h" || "$subcmd" == "--help" ]] && exit_code=0
+    __dependabot_usage "$exit_code"
+  fi
+  shift
+  local prs=()
+  mapfile -t prs < <(prs::dependabot_prs)
+  if [[ "${#prs[@]}" -eq 0 ]]; then
+    echo "ℹ️  No open dependabot PRs found" >&2
+    return
+  fi
+  case "$subcmd" in
+  rebase)
+    for pr in "${prs[@]}"; do
+      echo "🤖  Trigger dependabot rebase on PR $pr" >&2
+      gh pr comment "$pr" --body "@dependabot rebase"
+    done
+    ;;
+  recreate)
+    for pr in "${prs[@]}"; do
+      echo "🤖  Trigger dependabot recreate on PR $pr" >&2
+      gh pr comment "$pr" --body "@dependabot recreate"
+    done
+    ;;
+  *)
+    echo "Invalid dependabot sub-command [$subcmd]" >&2
+    __dependabot_usage 1
+    ;;
+  esac
+}

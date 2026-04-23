@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# gh-prs: batch operations on pull requests
+set -eo pipefail
+
+BASEDIR=$(dirname "$0")
+CMD_LIST=""
+
+# Add a label to each PR; skips if label doesn't exist in repo or already applied
+cmd_label() {
+  local label
+  label=$(prs::require_label "gh prs label <label> [pr...]" "$1")
+  shift
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    if ! prs::label_exists_in_repo "$pr" "$label"; then
+      echo "🏷️  Label '$label' does not exist in the repository for PR $pr, skipping" >&2
+      continue
+    fi
+    if prs::pr_has_label "$pr" "$label"; then
+      echo "🏷️  PR $pr already has label '$label', skipping" >&2
+      continue
+    fi
+    echo "🏷️  Add label '$label' to PR $pr" >&2
+    gh pr edit --add-label "$label" "$pr"
+  done
+}
+
+# Remove a label from each PR; skips if label is not currently applied
+cmd_remove_label() {
+  local label
+  label=$(prs::require_label "gh prs remove-label <label> [pr...]" "$1")
+  shift
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    if ! prs::pr_has_label "$pr" "$label"; then
+      echo "🏷️  PR $pr does not have label '$label', skipping" >&2
+      continue
+    fi
+    echo "🏷️  Remove label '$label' from PR $pr" >&2
+    gh pr edit --remove-label "$label" "$pr"
+  done
+}
+
+# Rebase each PR branch against its base
+cmd_rebase() {
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    echo "🔀  Rebase PR $pr" >&2
+    gh pr update-branch "$pr" --rebase
+  done
+}
+
+# Approve each PR
+cmd_approve() {
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    echo "👍  Approve PR $pr" >&2
+    gh pr review --approve "$pr"
+  done
+}
+
+# Approve and squash-merge each PR
+cmd_bot_merge() {
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    echo "🤖  Approve and squash-merge PR $pr" >&2
+    gh pr review --approve "$pr"
+    gh squash-merge "$pr" --use-default-msg
+  done
+}
+
+source_commands() {
+  CMD_LIST="label|remove-label|rm-label|rebase|approve|bot-merge"
+  for f in "$BASEDIR"/includes/cmd_*; do
+    #shellcheck disable=SC1090
+    source "$f"
+    name=$(basename "$f")
+    action="${name#cmd_}"
+    CMD_LIST+="|${action//_/-}"
+  done
+}
+
+#shellcheck disable=SC1091
+source "$BASEDIR/includes/common"
+source_commands
+
+CMD=$1 || true
+CMD=${CMD:="help"}
+if [[ "$#" -ne "0" ]]; then shift; fi
+
+if [[ "$CMD" == "help" || "$CMD" == "--help" || "$CMD" == "-h" ]]; then
+  prs_help
+  exit 0
+fi
+
+if [[ ! "${CMD}" =~ ^($CMD_LIST)$ ]]; then
+  echo "Invalid command [$CMD]" >&2
+  prs_help
+  exit 1
+fi
+
+safe_cmd="${CMD//-/_}"
+# resolve aliases
+case "$safe_cmd" in
+rm_label) safe_cmd="remove_label" ;;
+dbot) safe_cmd="dependabot" ;;
+esac
+"cmd_${safe_cmd}" "$@"

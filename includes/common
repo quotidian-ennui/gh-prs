@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+export GH_PAGER="cat"
+
+prs_help() {
+  cat <<EOF
+
+Usage: gh prs <command> [options] [pr...]
+
+  retry               : retry all failed jobs for each <pr>
+  label               : add a label to each <pr>
+  remove-label        : remove a label from each <pr> (aliased as 'rm-label')
+  rebase              : update each <pr> branch via rebase
+  approve             : approve each <pr>
+  bot-merge           : approve and squash-merge each <pr>
+  dependabot          : trigger dependabot sub-commands on all open dependabot PRs (aliased as 'dbot')
+                           rebase   : post @dependabot rebase
+                           recreate : post @dependabot recreate
+  help                : show this help message
+
+If no <pr> is supplied the PR for the current branch is used.
+Terminates with a warning if the current branch is the default branch.
+
+<pr> can be a number or a URL.
+
+EOF
+}
+
+prs::require_label() {
+  local usage="$1"
+  local label="$2"
+  if [[ -z "$label" ]]; then
+    echo "Usage: $usage" >&2
+    exit 1
+  fi
+  echo "$label"
+}
+
+prs::label_exists_in_repo() {
+  local pr="$1"
+  local label="$2"
+  local repo_args=()
+
+  if [[ "$pr" =~ ^https://github.com/ ]]; then
+    local repo
+    repo="${pr##https://github.com/}"
+    repo="${repo%%/pull*}"
+    repo_args=("--repo" "$repo")
+  fi
+
+  local found
+  found=$(gh label list "${repo_args[@]}" --json name | jq -r --arg label "$label" '.[] | select(.name == $label) | .name')
+  [[ "$found" == "$label" ]]
+}
+
+prs::pr_has_label() {
+  local pr="$1"
+  local label="$2"
+  local found
+  found=$(gh pr view "$pr" --json labels | jq -r --arg label "$label" '.labels[] | select(.name == $label) | .name')
+  [[ "$found" == "$label" ]]
+}
+
+prs::current_branch() {
+  git branch --show-current
+}
+
+prs::default_branch() {
+  gh repo view --json defaultBranchRef --jq ".defaultBranchRef.name"
+}
+
+prs::is_default_branch() {
+  local current default
+  current=$(prs::current_branch)
+  default=$(prs::default_branch)
+  [[ "$current" == "$default" ]]
+}
+
+prs::dependabot_prs() {
+  gh pr list --author "app/dependabot" --state open --json number --jq ".[].number"
+}
+
+prs::resolve_prs() {
+  if [[ "$#" -gt 0 ]]; then
+    for pr in "$@"; do
+      echo "$pr"
+    done
+    return
+  fi
+  if prs::is_default_branch; then
+    echo "⚠️ on default branch, cannot determine PR" >&2
+    exit 1
+  fi
+  local pr_number
+  pr_number=$(gh pr view --json number --jq ".number" 2>/dev/null || true)
+  if [[ -z "$pr_number" ]]; then
+    echo "⚠️ no PR found for current branch" >&2
+    exit 1
+  fi
+  echo "$pr_number"
+}
