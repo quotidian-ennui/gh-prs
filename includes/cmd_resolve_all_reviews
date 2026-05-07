@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+#shellcheck disable=SC2016
+__RESOLVE_FIND_PR_GRAPHQL_ID='
+query ($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr) {
+      id
+    }
+  }
+}
+'
+
+#shellcheck disable=SC2016
+__RESOLVE_GRAPHQL_COMMENT_IDS='
+query ($pr_id: ID!, $endCursor: String) {
+  node(id: $pr_id) {
+    ... on PullRequest {
+      reviewThreads(first: 100, after: $endCursor) {
+        nodes {
+          id
+          isResolved
+          isOutdated
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+}
+'
+
+#shellcheck disable=SC2016
+__RESOLVE_GRAPHQL_RESOLVE_COMMENT='
+mutation ($thread_id: ID!) {
+  resolveReviewThread(input: {threadId: $thread_id}) {
+    thread {
+      id
+    }
+  }
+}
+'
+
+__resolve_compress_query() {
+  printf '%s' "$1" | tr -d '\n'
+}
+
+__resolve_get_pr_node_id() {
+  local owner="$1"
+  local repo="$2"
+  local pr="$3"
+  gh api graphql -F owner="$owner" -F repo="$repo" -F pr="$pr" \
+    --raw-field query="$(__resolve_compress_query "$__RESOLVE_FIND_PR_GRAPHQL_ID")" \
+    | jq -r '.data.repository.pullRequest.id'
+}
+
+__resolve_get_pr_comment_ids() {
+  local pr_id="$1"
+  gh api graphql --paginate -F pr_id="$pr_id" \
+    --raw-field query="$(__resolve_compress_query "$__RESOLVE_GRAPHQL_COMMENT_IDS")" \
+    | jq -r -c '.data.node.reviewThreads.nodes[]'
+}
+
+__resolve_pr_review_thread() {
+  local thread_id="$1"
+  gh api graphql -F thread_id="$thread_id" \
+    --raw-field query="$(__resolve_compress_query "$__RESOLVE_GRAPHQL_RESOLVE_COMMENT")" \
+    >/dev/null 2>&1
+}
+
+__resolve_all_reviews_for_pr() {
+  local pr="$1"
+  local repo owner pr_node
+
+  if [[ "$pr" =~ ^https://github.com/ ]]; then
+    local repo_path
+    repo_path="${pr##https://github.com/}"
+    repo_path="${repo_path%%/pull*}"
+    repo=$(echo "$repo_path" | cut -d/ -f2)
+    owner=$(echo "$repo_path" | cut -d/ -f1)
+    pr=$(echo "${pr##*/pull/}" | cut -d/ -f1)
+  else
+    local repo_info
+    repo_info=$(gh repo view --json "name,owner")
+    repo=$(echo "$repo_info" | jq -r '.name')
+    owner=$(echo "$repo_info" | jq -r '.owner.login')
+  fi
+
+  pr_node=$(__resolve_get_pr_node_id "$owner" "$repo" "$pr")
+  local review_threads=()
+  mapfile -t review_threads < <(__resolve_get_pr_comment_ids "$pr_node")
+  for comment in "${review_threads[@]}"; do
+    local comment_id is_resolved outdated
+    comment_id=$(echo "$comment" | jq -r ".id")
+    is_resolved=$(echo "$comment" | jq -r ".isResolved")
+    outdated=$(echo "$comment" | jq -r ".isOutdated")
+    if [[ "$is_resolved" != "true" && "$outdated" != "true" ]]; then
+      echo "🔎  Mark [$comment_id] as resolved" >&2
+      __resolve_pr_review_thread "$comment_id"
+    fi
+  done
+}
+
+cmd_resolve_all_reviews() {
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    echo "✅  Resolve all review threads for PR $pr" >&2
+    __resolve_all_reviews_for_pr "$pr"
+  done
+}

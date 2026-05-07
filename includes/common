@@ -13,6 +13,8 @@ Usage: gh prs <command> [options] [pr...]
   rebase              : update each <pr> branch via rebase
   approve             : approve each <pr>
   bot-merge           : approve and squash-merge each <pr>
+  resolve-all-reviews : resolve all open review threads for each <pr> (aliased as 'resolve')
+  lazy-merge          : resolve all review threads then merge-train each <pr>
   dependabot          : trigger dependabot sub-commands on all open dependabot PRs (aliased as 'dbot')
                            rebase   : post @dependabot rebase
                            recreate : post @dependabot recreate
@@ -22,6 +24,10 @@ If no <pr> is supplied the PR for the current branch is used.
 Terminates with a warning if the current branch is the default branch.
 
 <pr> can be a number or a URL.
+
+Required gh extensions:
+  gh squash-merge  : used by bot-merge (and merge-train)
+  gh merge-train   : used by lazy-merge
 
 EOF
 }

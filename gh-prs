@@ -74,8 +74,19 @@ cmd_bot_merge() {
   done
 }
 
+# Resolve all review threads then merge-train each PR
+cmd_lazy_merge() {
+  local prs=()
+  mapfile -t prs < <(prs::resolve_prs "$@")
+  for pr in "${prs[@]}"; do
+    echo "🦥  Lazy merge PR $pr" >&2
+    cmd_resolve_all_reviews "$pr"
+    gh merge-train "$pr"
+  done
+}
+
 source_commands() {
-  CMD_LIST="label|remove-label|rm-label|rebase|approve|bot-merge"
+  CMD_LIST="label|remove-label|rm-label|rebase|approve|bot-merge|lazy-merge|resolve"
   for f in "$BASEDIR"/includes/cmd_*; do
     #shellcheck disable=SC1090
     source "$f"
@@ -109,5 +120,6 @@ safe_cmd="${CMD//-/_}"
 case "$safe_cmd" in
 rm_label) safe_cmd="remove_label" ;;
 dbot) safe_cmd="dependabot" ;;
+resolve) safe_cmd="resolve_all_reviews" ;;
 esac
 "cmd_${safe_cmd}" "$@"
