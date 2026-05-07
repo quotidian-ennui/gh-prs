@@ -51,7 +51,7 @@ __resolve_get_pr_node_id() {
   local owner="$1"
   local repo="$2"
   local pr="$3"
-  gh api graphql --paginate -F owner="$owner" -F repo="$repo" -F pr="$pr" \
+  gh api graphql -F owner="$owner" -F repo="$repo" -F pr="$pr" \
     --raw-field query="$(__resolve_compress_query "$__RESOLVE_FIND_PR_GRAPHQL_ID")" \
     | jq -r '.data.repository.pullRequest.id'
 }
@@ -65,7 +65,7 @@ __resolve_get_pr_comment_ids() {
 
 __resolve_pr_review_thread() {
   local thread_id="$1"
-  gh api graphql --paginate -F thread_id="$thread_id" \
+  gh api graphql -F thread_id="$thread_id" \
     --raw-field query="$(__resolve_compress_query "$__RESOLVE_GRAPHQL_RESOLVE_COMMENT")" \
     >/dev/null 2>&1
 }
