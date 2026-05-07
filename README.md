@@ -1,6 +1,6 @@
 # gh-prs
 
-Just a bunch of wrappers around existing functionality I have as aliases that manipulate PRs en-masse
+Just a bunch of wrappers around existing functionality some of which I already had as aliases. If you end up managing a lot of repositories that end up having the same "PRs" raised on them (oooh, look it's yet another release of dependency X that I tend to import in all my code; you know which ones they are).
 
 ## Commands
 
@@ -9,28 +9,24 @@ Just a bunch of wrappers around existing functionality I have as aliases that ma
 - `gh prs resolve-all-reviews [pr...]`
   - Because you've foolishly asked some AI bot to review your PR, and there is a lot of meaningless slop that is causing you a bit of frustration; why not just resolve all that shit already.
 - `gh prs lazy-merge [pr...]`
-  - This is the equivalent of doing `gh resolve-all-reviews` and `gh merge-train` for every PR.
-  - 💥💥 Like Homer's drinking bird, you're super lazy. You're an awful person, and you don't deserve good things.
+  - This is the equivalent of doing `gh prs resolve-all-reviews` and then `gh merge-train` for every PR.
+  - Like Homer's drinking bird, you're super lazy. What a life you have; and in some ways; maybe you don't deserve nice things; yet here we are (being lazy isn't bad, it is after all the mother of all invention).
+  - ![drinking-bird](https://media.tenor.com/SFmuIQmkIkQAAAAM/catfix-funny.gif)
 - `gh prs label <label> [pr...]`
-  - simply executes `gh pr edit --add-label <label> <pr>` for each prsupplied
+  - simply executes `gh pr edit --add-label <label> <pr>` for each pr supplied. It will try to check if that label exists before doing something.
 - `gh prs remove-label <label> [pr...]`
-  - simply executes `gh pr edit --remove-label <label> <pr>` for each pr supplied
+  - simply executes `gh pr edit --remove-label <label> <pr>` for each pr supplied.  It will try to check if that label exists before doing something.
 - `gh prs rebase [pr...]`
-  - equivalent to the alias `rebase: '!for i in $@; do gh pr update-branch $i --rebase; done'`
+  - It's fewer keystrokes than the alias `rebase: '!for i in $@; do gh pr update-branch $i --rebase; done'`
 - `gh prs approve [pr...]`
-  - equivalent to the alias `approve: '!for i in $@; do gh pr review --approve $i; done'`
+  - It's fewer keystrokes than the alias `approve: '!for i in $@; do gh pr review --approve $i; done'`
 - `gh prs bot-merge [pr...]`
-  - equivalent to the alias `bot-merge: '!for i in $@; do gh approve $i; gh squash-merge $i --use-default-msg; done'`
+  - It's fewer keystrokes than the alias `bot-merge: '!for i in $@; do gh approve $i; gh squash-merge $i --use-default-msg; done'`
 - `gh prs dependabot rebase`
   - equivalent to the alias `dbot-rebase: '!gh pr list -A "app/dependabot" --json number --jq ".[].number" | xargs -r -IID gh pr comment --body "@dependabot rebase" ID'`
 - `gh prs dependabot recreate`
   - equivalent to the alias `dbot-recreate: '!gh pr list -A "app/dependabot" --json number --jq ".[].number" | xargs -r -IID gh pr comment --body "@dependabot recreate" ID'`
 
-
-### Notes
-
-> - if no `<pr>` is passed then it tries to work out of there is a PR associated with the branch, and always terminates with a warning in the branch is the default branch.
-> - `<pr>` can be a number or a URL.
 
 ### Help
 
