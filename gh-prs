@@ -86,7 +86,7 @@ cmd_lazy_merge() {
 }
 
 source_commands() {
-  CMD_LIST="label|remove-label|rm-label|rebase|approve|bot-merge|lazy-merge|resolve"
+  CMD_LIST="label|remove-label|rm-label|rebase|approve|bot-merge|lazy-merge|resolve|dbot"
   for f in "$BASEDIR"/includes/cmd_*; do
     #shellcheck disable=SC1090
     source "$f"
@@ -118,7 +118,7 @@ fi
 safe_cmd="${CMD//-/_}"
 # resolve aliases
 case "$safe_cmd" in
-rm_label) safe_cmd="remove_label" ;;
+rm-label) safe_cmd="remove_label" ;;
 dbot) safe_cmd="dependabot" ;;
 resolve) safe_cmd="resolve_all_reviews" ;;
 esac
